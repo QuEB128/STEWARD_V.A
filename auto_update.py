@@ -41,3 +41,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+print("\n✨ New feature added in v1.1!")
