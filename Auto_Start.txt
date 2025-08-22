@@ -1,0 +1,16 @@
+#first run:
+
+mkdir -p ~/.config/autostart
+nano ~/.config/autostart/steward.desktop
+
+
+
+
+
+#then paste this in the file:
+[Desktop Entry]
+Type=Application
+Name=Steward VA
+Exec=lxterminal -e bash -c "cd ~/PROJECT; source venv/bin/activate; cd STEWARD; python Main.py; exec bash"
+Comment=Auto-start Steward Virtual Assistant
+X-GNOME-Autostart-enabled=true
