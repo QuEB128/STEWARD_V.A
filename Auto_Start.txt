@@ -14,3 +14,32 @@ Name=Steward VA
 Exec=lxterminal -e bash -c "cd ~/PROJECT; source venv/bin/activate; cd STEWARD; python Main.py; exec bash"
 Comment=Auto-start Steward Virtual Assistant
 X-GNOME-Autostart-enabled=true
+
+
+
+
+
+
+
+
+
+
+##Using crontab (Simplest)##
+Edit crontab:
+
+bash
+crontab -e
+
+Add this line to run after reboot:
+@reboot /home/pi/run_led_script.sh
+
+
+
+
+
+
+
+
+
+
+
