@@ -4,6 +4,7 @@ import numpy as np
 import time
 import pyttsx3
 from threading import Thread
+import enchant
 import re
 
 # Path to Tesseract
@@ -112,6 +113,15 @@ def extract_text(img):
     
     return best_text.strip()
 
+def filter_english_words(sentence):
+    d = enchant.Dict("en_US")
+    words = re.findall(r"\b\w+\b", sentence)
+    filtered = [
+        word for word in words
+        if d.check(word) and (len(word) > 1 or word.lower() in ['a', 'i'])
+    ]
+    return " ".join(filtered)
+
 def capture_and_process(frame):
     global processing, last_capture_time
     
@@ -134,7 +144,7 @@ def capture_and_process(frame):
     
     if raw_text:
         print("\n" + "="*40)
-        print("RAW TEXT:\n", raw_text)
+        #print("RAW TEXT:\n", raw_text)print("\n\nFiltered TEXT:\n", filter_english_words(raw_text))
         print("="*40)
         speak(raw_text)
     else:
