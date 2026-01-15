@@ -4,6 +4,7 @@ gTTS
 gpiozero
 pyttsx3
 google-generativeai
+google.genai
 Pillow
 opencv-python
 numpy<2
