@@ -1,0 +1,9 @@
+pygame
+SpeechRecognition
+gTTS
+gpiozero
+pyttsx3
+google-generativeai
+Pillow
+opencv-python
+numpy<2
