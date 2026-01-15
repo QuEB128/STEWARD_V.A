@@ -5,6 +5,7 @@ gpiozero
 pyttsx3
 google-generativeai
 google.genai
+google
 Pillow
 opencv-python
 numpy<2
