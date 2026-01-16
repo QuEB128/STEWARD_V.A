@@ -1,0 +1,302 @@
+import os
+import time
+import io
+
+import pyttsx3
+import speech_recognition as sr
+from gpiozero import Button, LED
+
+from PIL import Image
+import cv2
+import numpy as np
+from picamera2 import Picamera2
+
+from google import genai
+
+from gtts import gTTS
+import subprocess
+import tempfile
+
+
+# =========================
+# HARDWARE SETUP
+# =========================
+led = LED(17)
+button1 = Button(5)
+button2 = Button(4)
+exit_button = Button(2)
+
+# =========================
+# SPEECH SETUP
+# =========================
+recognizer = sr.Recognizer()
+
+IMAGE_PATH = "image_to_examine/image.jpg"
+'''def read_text(text):
+    engine = pyttsx3.init()
+    engine.setProperty("rate", 150)
+    engine.say(text)
+    engine.runAndWait()'''
+    
+def read_text(text, lang='en'):
+    """
+    Convert text to speech using gTTS and play it using mpg123.
+    """
+    try:
+        # Create a temporary MP3 file
+        with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
+            tts = gTTS(text=text, lang=lang)
+            tts.save(fp.name)
+            # Play using mpg123 (already installed)
+            subprocess.run(["mpg123", "-q", fp.name], check=True)
+    except Exception as e:
+        print(f"? Failed to speak: {e}")
+
+def speech_to_text():
+    with sr.Microphone() as source:
+        read_text("Please say your command")
+        recognizer.adjust_for_ambient_noise(source)
+        audio = recognizer.listen(source)
+    try:
+        return recognizer.recognize_google(audio)
+    except sr.UnknownValueError:
+        read_text("Sorry, I did not understand")
+        return ""
+    except sr.RequestError:
+        read_text("Network error")
+        return ""
+
+def wait_with_button2_check(duration):
+    start = time.time()
+    while time.time() - start < duration:
+        if button2.is_pressed:
+            return True
+        if exit_button.is_pressed:
+            return "exit"
+        time.sleep(0.1)
+    return False
+
+# =========================
+# STEWARD CLASS
+# =========================
+class STEWARD:
+    def __init__(self):
+        # Gemini client (NEW SDK)
+        self.client = genai.Client(
+            api_key="AIzaSyA9pholU__x3-QbWLAwQ1Io48WWeQDeRz4"   #os.getenv("GEMINI_API_KEY")
+        )
+
+        self.model_name = "gemini-2.5-flash"
+
+        self.image_dir = "image_to_examine"
+        os.makedirs(self.image_dir, exist_ok=True)
+
+    # -------------------------
+    # CAMERA
+    # -------------------------
+    def delete_existing_files(self):
+        for f in os.listdir(self.image_dir):
+            os.remove(os.path.join(self.image_dir, f))
+
+    #IMAGE_PATH = "image_to_examine/image.jpg"
+
+    def capture_image_rpicam(self):
+        os.makedirs("image_to_examine", exist_ok=True)
+
+        # Small delay to allow camera auto-exposure
+        time.sleep(1)
+
+        cmd = [
+            "rpicam-still",
+            "-o", IMAGE_PATH,
+            "--timeout", "1",
+            "--nopreview",
+            "--immediate"
+        ]
+
+        subprocess.run(cmd, check=True)
+        return IMAGE_PATH
+
+    def capture_image(self):
+        read_text("Keep the camera steady. Press the button to capture.")
+        '''filename = None
+
+        picam2 = Picamera2()
+        picam2.configure(
+            picam2.create_still_configuration(main={"size": (640, 480)})
+        )
+        picam2.start()
+        time.sleep(2)'''
+
+        try:
+            while True:
+                #frame = picam2.capture_array()
+
+                if button2.is_pressed:
+                    read_text("Capturing image")
+                    self.delete_existing_files()
+                    #filename = os.path.join(self.image_dir, "image.jpg")
+                    #cv2.imwrite(filename, frame)
+                    filename = self.capture_image_rpicam()
+                    read_text("Analyzing")
+                    #break
+                    return filename
+
+                if exit_button.is_pressed:
+                    return None
+
+                time.sleep(0.05)
+
+        finally:
+            print("done")
+            '''picam2.stop()
+            picam2.close()'''
+
+        #return None #filename
+
+    def load_image(self):
+        path = os.path.join(self.image_dir, "image.jpg")
+        return Image.open(path).convert("RGB")
+
+    # -------------------------
+    # GEMINI HELPERS
+    # -------------------------
+    def gemini_image_prompt(self, image, prompt):
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=[prompt, image]
+        )
+        return response.text.replace("*", "")
+
+    # -------------------------
+    # FEATURES
+    # -------------------------
+    def describe_image(self):
+        led.on()
+        if not self.capture_image():
+            led.off()
+            return
+
+        image = self.load_image()
+        text = self.gemini_image_prompt(
+            image,
+            "Describe this image clearly for a visually impaired person."
+        )
+        read_text(text)
+        led.off()
+
+    def start_chat(self):
+        led.on()
+        if not self.capture_image():
+            led.off()
+            return
+
+        image = self.load_image()
+        short_desc = self.gemini_image_prompt(
+            image,
+            "Describe this image in less than 30 words."
+        )
+
+        read_text(short_desc)
+        read_text("Press the button for more details.")
+
+        if wait_with_button2_check(2):
+            detailed = self.gemini_image_prompt(
+                image,
+                "Describe this image in detail as a vision assistant."
+            )
+            read_text(detailed)
+
+        led.off()
+
+
+    def detect_currency(self):
+        led.on()
+        if not self.capture_image():
+            led.off()
+            return
+
+        image = self.load_image()
+        text = self.gemini_image_prompt(
+            image,
+            "Detect currency and amount. If none, say 'No money detected'."
+        )
+        read_text(text)
+        led.off()
+
+    def translate_language(self):
+        led.on()
+        if not self.capture_image():
+            led.off()
+            return
+
+        image = self.load_image()
+        text = self.gemini_image_prompt(
+            image,
+            "Translate any visible text to English. If none, say 'No visible text detected'."
+        )
+        read_text(text)
+        led.off()
+
+    def extract_text_exact(self):
+        led.on()
+        if not self.capture_image():
+            led.off()
+            return
+
+        image = self.load_image()
+        text = self.gemini_image_prompt(
+            image,
+            "Extract the exact text in this image. Do not add words."
+        )
+        read_text(text)
+        led.off()
+
+    def chat_mode(self):
+        led.on()
+        read_text("AI mode activated")
+
+        while True:
+            #user_text = speech_to_text().lower()
+            user_text = input(">> ").lower()
+
+            if any(k in user_text for k in ["exit", "quit", "back"]):
+                break
+
+            if any(k in user_text for k in ["describe", "image", "see"]):
+                self.start_chat()
+            else:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=user_text
+                )
+                read_text(response.text.replace("*", ""))
+
+        led.off()
+
+# =========================
+# ENTRY POINTS
+# =========================
+def start_chat():
+    STEWARD().start_chat()
+
+def describe():
+    STEWARD().describe_image()
+
+def detect_currency():
+    STEWARD().detect_currency()
+
+def translate():
+    STEWARD().translate_language()
+
+def extract_text():
+    STEWARD().extract_text_exact()
+
+def chat():
+    STEWARD().chat_mode()
+
+# =========================
+# RUN
+# =========================
+if __name__ == "__main__":
+    chat()
