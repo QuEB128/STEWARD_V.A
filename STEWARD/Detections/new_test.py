@@ -38,19 +38,37 @@ IMAGE_PATH = "image_to_examine/image.jpg"
     engine.say(text)
     engine.runAndWait()'''
     
+
+        
 def read_text(text, lang='en'):
     """
-    Convert text to speech using gTTS and play it using mpg123.
+    Convert text to speech using gTTS and play it.
+    Stops reading when button on GPIO 2 is pressed.
     """
     try:
-        # Create a temporary MP3 file
         with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
             tts = gTTS(text=text, lang=lang)
             tts.save(fp.name)
-            # Play using mpg123 (already installed)
-            subprocess.run(["mpg123", "-q", fp.name], check=True)
+
+            # Start audio playback
+            process = subprocess.Popen(
+                ["mpg123", "-q", fp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            # Monitor button while audio is playing
+            while process.poll() is None:
+                if exit_button.is_pressed:
+                    print("Button pressed stopping speech")
+                    process.terminate()
+                    break
+                time.sleep(0.05)
+
     except Exception as e:
         print(f"? Failed to speak: {e}")
+
+
 
 def speech_to_text():
     with sr.Microphone() as source:
@@ -83,7 +101,7 @@ class STEWARD:
     def __init__(self):
         # Gemini client (NEW SDK)
         self.client = genai.Client(
-            api_key= "AIzaSyAWsLEwiC05ubH98B2LqeRpAYHU9gudCLA"   #AIzaSyA9pholU__x3-QbWLAwQ1Io48WWeQDeRz4"   #os.getenv("GEMINI_API_KEY")
+            api_key= "AIzaSyDxoA34W61H363zaYzASrkIedgByeGEsCU"  #os.getenv("GEMINI_API_KEY")
         )
 
         self.model_name = "gemini-2.5-flash"
@@ -323,4 +341,3 @@ def text_extraction():
 # =========================
 #if __name__ == "__main__":
 #    chat()
-
