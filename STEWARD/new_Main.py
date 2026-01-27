@@ -5,6 +5,7 @@ Clean, optimized, and professional rewrite.
 """
 
 import io
+import os
 import time
 import pygame
 import speech_recognition as sr
@@ -124,6 +125,47 @@ def speech_to_text() -> str:
     except sr.RequestError:
         speak("Please make sure you are online.")
         return ""
+
+LANGUAGES = {
+    "English": "en",
+    "French": "fr",
+    "Swahili": "sw",
+    "Hausa": "ha"
+}
+
+def select_language():
+    """Allow user to select language via buttons."""
+    languages = [
+        ("English", "en"),
+        ("French", "fr"),
+        ("Swahili", "sw"),
+        ("Hausa", "ha")
+    ]
+
+    speak("Language selection mode activated:")
+
+    for lang_name, lang_code in languages:
+        speak(lang_name)
+        result = wait_for_button(button2, 1.5)  # Wait 1.5s for button2 press
+        if result:
+            # Confirm selection
+            speak(f"You selected {lang_name}. Press again to confirm.")
+            confirm = wait_for_button(button2, 2.0)  # Wait 2s for confirmation
+            if confirm:
+                # Save selected language
+                with open(os.path.join(os.path.dirname(__file__), "Detections/lang.txt"), "w") as f:
+                    f.write(lang_code)
+                speak(f"{lang_name} set as your preferred language.")
+                return lang_code
+        # Optional small pause before moving to next language
+        time.sleep(0.2)
+
+    # If no selection made
+    speak("No language selected. Defaulting to English.")
+    with open(os.path.join(os.path.dirname(__file__), "Detections/lang.txt"), "w") as f:
+        f.write("en")
+    return "en"
+
 
 
 # ---------------------------
@@ -290,6 +332,11 @@ def button_selection_mode():
             speak("...instant read...")
             if wait_for_button(button2, 1.5):
                 ai_extract_text()
+
+        # === LANGUAGE SELECTION ===
+        speak("Select language for assistant.")
+        if wait_for_button(button2, 1.5):
+            select_language()
 
         # ------------------------------------
         # ? AFTER ALL OPTIONS: WAIT HERE
