@@ -12,7 +12,7 @@ import numpy as np
 from picamera2 import Picamera2
 
 from google import genai
-
+from deep_translator import GoogleTranslator
 from gtts import gTTS
 import subprocess
 import tempfile
@@ -39,12 +39,9 @@ IMAGE_PATH = "image_to_examine/image.jpg"
     engine.runAndWait()'''
     
 
-        
+'''      
 def read_text(text, lang='en'):
-    """
-    Convert text to speech using gTTS and play it.
-    Stops reading when button on GPIO 2 is pressed.
-    """
+    
     try:
         with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
             tts = gTTS(text=text, lang=lang)
@@ -66,7 +63,64 @@ def read_text(text, lang='en'):
                 time.sleep(0.05)
 
     except Exception as e:
-        print(f"? Failed to speak: {e}")
+        print(f"? Failed to speak: {e}") '''
+
+def read_text(text):
+    try:
+        # =========================
+        # READ LANGUAGE CODE
+        # =========================
+        lang_file = os.path.join(os.path.dirname(__file__), "lang.txt")
+        lang_code = None
+
+        if os.path.exists(lang_file):
+            with open(lang_file, "r") as f:
+                code = f.read().strip().lower()
+                if code:
+                    lang_code = code
+
+        # =========================
+        # TRANSLATE (IF NEEDED)
+        # =========================
+        if lang_code:
+            try:
+                spoken_text = GoogleTranslator(source='en', target=lang_code).translate(text)
+                tts_lang = lang_code
+                print(f"Translated ({lang_code}): {spoken_text}")
+            except Exception as e:
+                print(f"? Translation failed, speaking English: {e}")
+                spoken_text = text
+                tts_lang = "en"
+        else:
+            spoken_text = text
+            tts_lang = "en"
+            print("No language set speaking English")
+
+        # =========================
+        # TEXT TO SPEECH
+        # =========================
+        with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
+            tts = gTTS(text=spoken_text, lang=tts_lang)
+            tts.save(fp.name)
+
+            process = subprocess.Popen(
+                ["mpg123", "-q", fp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            # =========================
+            # BUTTON INTERRUPT
+            # =========================
+            while process.poll() is None:
+                if exit_button.is_pressed:
+                    print("?? Button pressed stopping speech")
+                    process.terminate()
+                    break
+                time.sleep(0.05)
+
+    except Exception as e:
+        print("? Error:", e)
 
 
 
