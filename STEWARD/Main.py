@@ -5,6 +5,7 @@ Clean, optimized, and professional rewrite.
 """
 
 import io
+import os
 import time
 import pygame
 import speech_recognition as sr
@@ -13,6 +14,7 @@ import pyttsx3
 
 import lib
 from gpiozero import Button
+from datetime import datetime
 
 # ---------------------------
 # HARDWARE CONFIG
@@ -21,7 +23,6 @@ led = lib.test.led
 button1 = lib.test.button1     # Voice-select mode
 button2 = lib.test.button2     # Button-select mode
 exit_button = lib.test.exit_button
-
 # ---------------------------
 # TTS ENGINE SETUP
 # ---------------------------
@@ -35,6 +36,12 @@ def speak(text: str):
     """Text-to-speech wrapper"""
     engine.say(text)
     engine.runAndWait()
+
+from datetime import datetime
+
+def tell_time():
+    now = datetime.now()
+    speak(f"it is {now.hour} : {now.minute:02d}")
 
 
 # ---------------------------
@@ -119,11 +126,52 @@ def speech_to_text() -> str:
         speak("Please make sure you are online.")
         return ""
 
+LANGUAGES = {
+    "English": "en",
+    "French": "fr",
+    "Swahili": "sw",
+    "Hausa": "ha"
+}
+
+def select_language():
+    """Allow user to select language via buttons."""
+    languages = [
+        ("English", "en"),
+        ("French", "fr"),
+        ("Swahili", "sw"),
+        ("Hausa", "ha")
+    ]
+
+    speak("Language selection mode activated:")
+
+    for lang_name, lang_code in languages:
+        speak(lang_name)
+        result = wait_for_button(button2, 1.5)  # Wait 1.5s for button2 press
+        if result:
+            # Confirm selection
+            speak(f"You selected {lang_name}. Press again to confirm.")
+            confirm = wait_for_button(button2, 2.0)  # Wait 2s for confirmation
+            if confirm:
+                # Save selected language
+                with open(os.path.join(os.path.dirname(__file__), "Detections/lang.txt"), "w") as f:
+                    f.write(lang_code)
+                speak(f"{lang_name} set as your preferred language.")
+                return lang_code
+        # Optional small pause before moving to next language
+        time.sleep(0.2)
+
+    # If no selection made
+    speak("No language selected. Defaulting to English.")
+    with open(os.path.join(os.path.dirname(__file__), "Detections/lang.txt"), "w") as f:
+        f.write("en")
+    return "en"
+
+
 
 # ---------------------------
 # TASK FUNCTIONS
 # ---------------------------
-def update_reminder():
+'''def update_reminder():
     lib.Reminder_Update.reminder_options()
 
 def check_schedule():
@@ -152,9 +200,7 @@ def detect_object():
 def shot_detect_obj():
     speak("Analyzing image for objects.")
     lib.detectObjFromImg.detectImg()
-
-def tell_time():
-    speak(lib.time.tell_time())
+'''
 
 def gemini_ai():
     lib.test.start_chat()
@@ -177,7 +223,7 @@ def ai_extract_text():
 def ai_extract_text_voice():
     lib.test.ai_extract_text()
 
-# ---------------------------
+# --------------------------
 # HELPER FUNCTIONS
 # ---------------------------
 def wait_with_button_check(duration: float):
@@ -272,7 +318,8 @@ def button_selection_mode():
 
             speak("...object detection...")
             if wait_for_button(button2, 1.5):
-                shot_detect_obj()
+                #shot_detect_obj() 
+                print("detect object")
 
         # === GROUP 3 ===
         speak("...Text extraction...")
@@ -285,6 +332,11 @@ def button_selection_mode():
             speak("...instant read...")
             if wait_for_button(button2, 1.5):
                 ai_extract_text()
+
+        # === LANGUAGE SELECTION ===
+        speak("Select language for assistant.")
+        if wait_for_button(button2, 1.5):
+            select_language()
 
         # ------------------------------------
         # ? AFTER ALL OPTIONS: WAIT HERE
