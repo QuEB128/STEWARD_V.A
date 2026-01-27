@@ -1,6 +1,7 @@
 import tempfile
 import subprocess
 import time
+import os
 from gtts import gTTS
 from googletrans import Translator
 from gpiozero import Button
@@ -11,23 +12,43 @@ from gpiozero import Button
 exit_button = Button(2, pull_up=True)
 
 # =========================
-# TRANSLATE + SPEAK
+# READ LANGUAGE CODE
 # =========================
-def translate_and_read(text, lang_code):
-    """
-    Translates English text to the given language code
-    and speaks it using gTTS.
-    Reading stops if GPIO 2 button is pressed.
-    """
-    try:
-        # Translate
-        translator = Translator()
-        translated = translator.translate(text, src='en', dest=lang_code).text
-        print(f"Translated ({lang_code}):", translated)
 
-        # Text-to-speech
+def translate_and_read(text):
+    try:
+        # =========================
+        # READ LANGUAGE CODE
+        # =========================
+        lang_file = os.path.join(os.path.dirname(__file__), "lang.txt")
+        lang_code = None
+
+        if os.path.exists(lang_file):
+            with open(lang_file, "r") as f:
+                code = f.read().strip().lower()
+                if code:
+                    lang_code = code
+
+        # =========================
+        # TRANSLATE (IF NEEDED)
+        # =========================
+        if lang_code:
+            translator = Translator()
+            spoken_text = translator.translate(
+                text, src="en", dest=lang_code
+            ).text
+            tts_lang = lang_code
+            print(f"Translated ({lang_code}): {spoken_text}")
+        else:
+            spoken_text = text
+            tts_lang = "en"
+            print("No language set ? Speaking English")
+
+        # =========================
+        # TEXT TO SPEECH
+        # =========================
         with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
-            tts = gTTS(text=translated, lang=lang_code)
+            tts = gTTS(text=spoken_text, lang=tts_lang)
             tts.save(fp.name)
 
             process = subprocess.Popen(
@@ -36,7 +57,9 @@ def translate_and_read(text, lang_code):
                 stderr=subprocess.DEVNULL
             )
 
-            # Monitor button while speaking
+            # =========================
+            # BUTTON INTERRUPT
+            # =========================
             while process.poll() is None:
                 if exit_button.is_pressed:
                     print("?? Button pressed stopping speech")
@@ -47,9 +70,6 @@ def translate_and_read(text, lang_code):
     except Exception as e:
         print("? Error:", e)
 
-# =========================
-# TEST
-# =========================
 if __name__ == "__main__":
     user_input = input("Enter English text: ")
-    translate_and_read(user_input, "sw")  # sw = Swahili
+    translate_and_read(user_input)
