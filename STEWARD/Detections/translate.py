@@ -1,29 +1,55 @@
 import tempfile
 import subprocess
+import time
 from gtts import gTTS
 from googletrans import Translator
+from gpiozero import Button
 
-def read_text(text, lang= 'sw'):
+# =========================
+# GPIO SETUP
+# =========================
+exit_button = Button(2, pull_up=True)
+
+# =========================
+# TRANSLATE + SPEAK
+# =========================
+def translate_and_read(text, lang_code):
     """
-    Convert text to speech using gTTS and play it using mpg123.
+    Translates English text to the given language code
+    and speaks it using gTTS.
+    Reading stops if GPIO 2 button is pressed.
     """
     try:
-        # Create a temporary MP3 file
+        # Translate
+        translator = Translator()
+        translated = translator.translate(text, src='en', dest=lang_code).text
+        print(f"Translated ({lang_code}):", translated)
+
+        # Text-to-speech
         with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
-            tts = gTTS(text=text, lang=lang)
+            tts = gTTS(text=translated, lang=lang_code)
             tts.save(fp.name)
-            # Play using mpg123 (already installed)
-            subprocess.run(["mpg123", "-q", fp.name], check=True)
+
+            process = subprocess.Popen(
+                ["mpg123", "-q", fp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            # Monitor button while speaking
+            while process.poll() is None:
+                if exit_button.is_pressed:
+                    print("?? Button pressed stopping speech")
+                    process.terminate()
+                    break
+                time.sleep(0.05)
+
     except Exception as e:
-        print(f"? Failed to speak: {e}")
+        print("? Error:", e)
 
-def translate_to_swahili(text):
-    translator = Translator()
-    result = translator.translate(text, src='en', dest='sw')
-    return result.text
-
+# =========================
+# TEST
+# =========================
 if __name__ == "__main__":
-    user_input = input("Enter text to translate to Swahili: ")
-    translated = translate_to_swahili(user_input)
-    print("Swahili:", translated)
-    read_text(translated)
+    user_input = input("Enter English text: ")
+    translate_and_read(user_input, "sw")  # sw = Swahili
