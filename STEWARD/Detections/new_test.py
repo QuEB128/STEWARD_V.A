@@ -190,7 +190,7 @@ class STEWARD:
         return IMAGE_PATH
 
     def capture_image(self):
-        read_text("Keep the camera steady. Press the button to capture.")
+        read_text("CAMERA READY")
         '''filename = None
 
         picam2 = Picamera2()
@@ -205,12 +205,12 @@ class STEWARD:
                 #frame = picam2.capture_array()
 
                 if button2.is_pressed:
-                    read_text("Capturing image")
+                    #read_text("Capturing image")
                     self.delete_existing_files()
                     #filename = os.path.join(self.image_dir, "image.jpg")
                     #cv2.imwrite(filename, frame)
                     filename = self.capture_image_rpicam()
-                    read_text("Analyzing")
+                    read_text("Analyzing image")
                     #break
                     return filename
 
@@ -252,7 +252,7 @@ class STEWARD:
         image = self.load_image()
         text = self.gemini_image_prompt(
             image,
-            "Describe this image clearly for a visually impaired person."
+            "Describe this image clearly for a visually impaired person.(in less than 50 words)"
         )
         read_text(text)
         led.off()
@@ -275,7 +275,7 @@ class STEWARD:
         if wait_with_button2_check(2):
             detailed = self.gemini_image_prompt(
                 image,
-                "Describe this image in detail as a vision assistant."
+                "Describe this image in detail as a vision assistant. (in less than 100 words)"
             )
             read_text(detailed)
 
@@ -291,7 +291,7 @@ class STEWARD:
         image = self.load_image()
         text = self.gemini_image_prompt(
             image,
-            "Detect currency and amount. If none, say 'No money detected'."
+            "Detect currency and amount(example: 20 ghana cedis). If none, say 'No money detected'."
         )
         read_text(text)
         led.off()
@@ -323,6 +323,21 @@ class STEWARD:
         )
         read_text(text)
         led.off()
+    def summarize_text(self):
+        led.on()
+        if not self.capture_image():
+            led.off()
+            return
+
+        image = self.load_image()
+        text = self.gemini_image_prompt(
+            image,
+            "summarize the exact text in this image as brief as possible."
+        )
+        read_text(text)
+        led.off()
+        
+    
 
     def chat_mode(self):
         led.on()
@@ -389,9 +404,13 @@ def ai_extract_text():
 
 def text_extraction():
     STEWARD().extract_text_exact()
+    
+def summarize_text():
+    STEWARD().summarize_text()
 
 # =========================
 # RUN
 # =========================
 #if __name__ == "__main__":
 #    chat()
+
