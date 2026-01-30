@@ -142,7 +142,7 @@ def select_language():
         ("Hausa", "ha")
     ]
 
-    speak("Language selection mode activated:")
+    #speak("Language selection mode activated:")
 
     for lang_name, lang_code in languages:
         speak(lang_name)
@@ -222,6 +222,9 @@ def ai_extract_text():
 
 def ai_extract_text_voice():
     lib.test.ai_extract_text()
+    
+def text_summary():
+    lib.test.summarize_text()
 
 # --------------------------
 # HELPER FUNCTIONS
@@ -293,11 +296,11 @@ def wait_for_button(button, duration: float):
 '''
 
 def button_selection_mode():
-    speak("...button select mode activated...")
+    #speak("...button select mode activated...")
 
     while True:
         led.off()
-        speak("...options...")
+        #speak("...options...")
 
         # === OPTION 1 ===
         speak("...tell time...")
@@ -305,43 +308,43 @@ def button_selection_mode():
             tell_time()
 
         # === GROUP 2 ===
-        speak("...detection features...")
+        speak("...detection...")
         result = wait_for_button(button2, 1.5)
         if result:
             speak("...detect currency...")
             if wait_for_button(button2, 1.5):
                 currency_detect()
 
-            speak("...describe environment...")
+            speak("...describe...")
             if wait_for_button(button2, 1.5):
                 gemini_ai()
 
-            speak("...object detection...")
+            speak("...detect object...")
             if wait_for_button(button2, 1.5):
                 #shot_detect_obj() 
                 print("detect object")
 
         # === GROUP 3 ===
-        speak("...Text extraction...")
+        speak("...Text...")
         result = wait_for_button(button2, 1.5)
         if result:
-            speak("...Online read...")
+            speak("...Summarize...")
             if wait_for_button(button2, 1.5):
-                text_to_speech()
+                text_summary()
 
             speak("...instant read...")
             if wait_for_button(button2, 1.5):
                 ai_extract_text()
 
         # === LANGUAGE SELECTION ===
-        speak("Select language for assistant.")
+        speak("language")
         if wait_for_button(button2, 1.5):
             select_language()
 
         # ------------------------------------
         # ? AFTER ALL OPTIONS: WAIT HERE
         # ------------------------------------
-        speak("Press the select button to hear options again.")
+        #speak("Press the select button to hear options again.")
         while True:
             if button2.is_pressed:
                 break
@@ -380,3 +383,4 @@ led.close()
 button1.close()
 button2.close()
 exit_button.close()
+
