@@ -32,10 +32,9 @@ engine.setProperty("rate", 150)
 # ---------------------------
 # SPEAK FUNCTION (core)
 # ---------------------------
-def speak(text: str):
-    """Text-to-speech wrapper"""
+"""def speak(text: str):
     engine.say(text)
-    engine.runAndWait()
+    engine.runAndWait()"""
 
 from datetime import datetime
 
@@ -167,7 +166,6 @@ def select_language():
     return "en"
 
 
-
 # ---------------------------
 # TASK FUNCTIONS
 # ---------------------------
@@ -202,6 +200,9 @@ def shot_detect_obj():
     lib.detectObjFromImg.detectImg()
 '''
 
+def object_detection():
+    lib.detect_objects.detectImg()
+    
 def gemini_ai():
     lib.test.start_chat()
 
@@ -225,6 +226,9 @@ def ai_extract_text_voice():
     
 def text_summary():
     lib.test.summarize_text()
+    
+def speak(msg):
+    lib.test.read_text(msg)
 
 # --------------------------
 # HELPER FUNCTIONS
@@ -303,7 +307,7 @@ def button_selection_mode():
         #speak("...options...")
 
         # === OPTION 1 ===
-        speak("...tell time...")
+        speak("...time...")
         if wait_for_button(button2, 1.5):
             tell_time()
 
@@ -322,7 +326,7 @@ def button_selection_mode():
             speak("...detect object...")
             if wait_for_button(button2, 1.5):
                 #shot_detect_obj() 
-                print("detect object")
+                object_detection()
 
         # === GROUP 3 ===
         speak("...Text...")
@@ -383,4 +387,3 @@ led.close()
 button1.close()
 button2.close()
 exit_button.close()
-
