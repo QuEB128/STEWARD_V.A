@@ -252,7 +252,7 @@ class STEWARD:
         image = self.load_image()
         text = self.gemini_image_prompt(
             image,
-            "Describe this image clearly for a visually impaired person.(in less than 50 words)"
+            "Describe this image clearly for a visually impaired person.(in less than 100 words)"
         )
         read_text(text)
         led.off()
@@ -275,7 +275,7 @@ class STEWARD:
         if wait_with_button2_check(2):
             detailed = self.gemini_image_prompt(
                 image,
-                "Describe this image in detail as a vision assistant. (in less than 100 words)"
+                "Describe this image in detail as a vision assistant. (in less than 150 words)"
             )
             read_text(detailed)
 
