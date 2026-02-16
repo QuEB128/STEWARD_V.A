@@ -155,7 +155,7 @@ class STEWARD:
     def __init__(self):
         # Gemini client (NEW SDK)
         self.client = genai.Client(
-            api_key= "AIzaSyDxoA34W61H363zaYzASrkIedgByeGEsCU"  #os.getenv("GEMINI_API_KEY")
+            api_key=  "AIzaSyATfdWOaXE96aVqFqP6hycNcBA0bekpyLU" #"AIzaSyDxoA34W61H363zaYzASrkIedgByeGEsCU"  #os.getenv("GEMINI_API_KEY")
         )
 
         self.model_name = "gemini-2.5-flash"
@@ -172,7 +172,8 @@ class STEWARD:
 
     #IMAGE_PATH = "image_to_examine/image.jpg"
 
-    def capture_image_rpicam(self):
+    def capture_image_rpicam(self):       
+        
         os.makedirs("image_to_examine", exist_ok=True)
 
         # Small delay to allow camera auto-exposure
@@ -187,7 +188,14 @@ class STEWARD:
         ]
 
         subprocess.run(cmd, check=True)
+
+        # Rotate anti-clockwise
+        img = cv2.imread(IMAGE_PATH)
+        rotated = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+        cv2.imwrite(IMAGE_PATH, rotated)
+        
         return IMAGE_PATH
+        
 
     def capture_image(self):
         read_text("CAMERA READY")
@@ -252,7 +260,7 @@ class STEWARD:
         image = self.load_image()
         text = self.gemini_image_prompt(
             image,
-            "Describe this image clearly for a visually impaired person.(in less than 100 words)"
+            "Describe this image clearly for a visually impaired person.(in less than 50 words)"
         )
         read_text(text)
         led.off()
@@ -275,7 +283,7 @@ class STEWARD:
         if wait_with_button2_check(2):
             detailed = self.gemini_image_prompt(
                 image,
-                "Describe this image in detail as a vision assistant. (in less than 150 words)"
+                "Describe this image in detail as a vision assistant. (in less than 100 words)"
             )
             read_text(detailed)
 
@@ -413,4 +421,3 @@ def summarize_text():
 # =========================
 #if __name__ == "__main__":
 #    chat()
-
