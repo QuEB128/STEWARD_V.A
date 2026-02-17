@@ -1,10 +1,13 @@
 import os
 import time
 import io
+import re
 
 import pyttsx3
 import speech_recognition as sr
 from gpiozero import Button, LED
+import threading
+from queue import Queue
 
 from PIL import Image
 import cv2
@@ -63,8 +66,9 @@ def read_text(text, lang='en'):
                 time.sleep(0.05)
 
     except Exception as e:
-        print(f"? Failed to speak: {e}") '''
-
+        print(f"? Failed to speak: {e}") 
+        
+    
 def read_text(text):
     try:
         # =========================
@@ -120,8 +124,94 @@ def read_text(text):
                 time.sleep(0.05)
 
     except Exception as e:
-        print("? Error:", e)
+        print("? Error:", e)'''
+        
+# -----------------------
+# Split text into smaller chunks
+# -----------------------
+def split_text_into_chunks(text, max_chars=200):
+    sentences = re.split(r'(?<=[.!?]) +', text)
+    chunks = []
+    current = ""
+    for s in sentences:
+        if len(current) + len(s) < max_chars:
+            current += s + " "
+        else:
+            chunks.append(current.strip())
+            current = s + " "
+    if current:
+        chunks.append(current.strip())
+    return chunks
 
+# -----------------------
+# Main streaming TTS function
+# -----------------------
+def read_text(text):
+    lang_file = os.path.join(os.path.dirname(__file__), "lang.txt")
+    lang_code = None
+    
+    print(text)
+    if os.path.exists(lang_file):
+        with open(lang_file, "r") as f:
+            code = f.read().strip().lower()
+            if code:
+                lang_code = code
+
+    # Translate text (optional, can skip for speed)
+    try:
+        spoken_text = GoogleTranslator(source='en', target=lang_code).translate(text)
+    except:
+        spoken_text = text
+
+    # Split into chunks
+    chunks = split_text_into_chunks(spoken_text)
+
+    # Queue for TTS mp3 files
+    audio_queue = Queue(maxsize=2)  # Buffer 1 chunk ahead
+    
+    # Worker thread to generate TTS
+    def tts_worker():
+        for chunk in chunks:
+            if exit_button.is_pressed:
+                break
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+                    tts = gTTS(text=chunk, lang=lang_code)
+                    tts.save(fp.name)
+                    audio_queue.put(fp.name)  # Put file path in queue
+            except Exception as e:
+                print(f"? TTS generation error: {e}")
+        audio_queue.put(None)  # Signal end
+
+    threading.Thread(target=tts_worker, daemon=True).start()
+
+    # Playback loop
+    while True:
+        mp3_path = audio_queue.get()
+        if mp3_path is None:
+            break  # Finished all chunks
+
+        try:
+            process = subprocess.Popen(
+                ["mpg123", "-q", mp3_path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            # Wait while allowing exit
+            while process.poll() is None:
+                if exit_button.is_pressed:
+                    process.terminate()
+                    return
+                time.sleep(0.05)
+
+        except Exception as e:
+            print(f"? Playback error: {e}")
+
+        finally:
+            # Cleanup temp file
+            if os.path.exists(mp3_path):
+                os.remove(mp3_path)
 
 
 def speech_to_text():
@@ -196,7 +286,7 @@ class STEWARD:
         
         return IMAGE_PATH
         
-
+        
     def capture_image(self):
         read_text("CAMERA READY")
         '''filename = None
@@ -288,7 +378,6 @@ class STEWARD:
             read_text(detailed)
 
         led.off()
-
 
     def detect_currency(self):
         led.on()
