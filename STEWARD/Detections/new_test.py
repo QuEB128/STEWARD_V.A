@@ -20,6 +20,8 @@ from gtts import gTTS
 import subprocess
 import tempfile
 
+import socket
+
 
 # =========================
 # HARDWARE SETUP
@@ -125,6 +127,15 @@ def read_text(text):
 
     except Exception as e:
         print("? Error:", e)'''
+
+def is_internet_available(timeout=2):
+    try:
+        # Connect to a reliable host (Google DNS)
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(("8.8.8.8", 53))
+        return True
+    except Exception:
+        return False
         
 # -----------------------
 # Split text into smaller chunks
@@ -147,6 +158,10 @@ def split_text_into_chunks(text, max_chars=200):
 # Main streaming TTS function
 # -----------------------
 def read_text(text):
+    if not is_internet_available():
+        play_audio("no_internet.mp3")
+        return
+        
     lang_file = os.path.join(os.path.dirname(__file__), "lang.txt")
     lang_code = None
     
@@ -356,6 +371,9 @@ class STEWARD:
     # GEMINI HELPERS
     # -------------------------
     def gemini_image_prompt(self, image, prompt):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
         response = self.client.models.generate_content(
             model=self.model_name,
             contents=[prompt, image]
@@ -380,6 +398,10 @@ class STEWARD:
         led.off()
 
     def start_chat(self):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
+            
         led.on()
         if not self.capture_image():
             led.off()
@@ -404,6 +426,10 @@ class STEWARD:
         led.off()
 
     def detect_currency(self):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
+            
         led.on()
         if not self.capture_image():
             led.off()
@@ -418,6 +444,9 @@ class STEWARD:
         led.off()
 
     def translate_language(self):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
         led.on()
         if not self.capture_image():
             led.off()
@@ -432,6 +461,10 @@ class STEWARD:
         led.off()
 
     def extract_text_exact(self):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
+            
         led.on()
         if not self.capture_image():
             led.off()
@@ -444,7 +477,12 @@ class STEWARD:
         )
         read_text(text)
         led.off()
+        
     def summarize_text(self):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
+            
         led.on()
         if not self.capture_image():
             led.off()
