@@ -266,7 +266,7 @@ class STEWARD:
         
         os.makedirs("image_to_examine", exist_ok=True)
 
-        # Small delay to allow camera auto-exposure
+        '''# Small delay to allow camera auto-exposure
         time.sleep(1)
 
         cmd = [
@@ -275,7 +275,24 @@ class STEWARD:
             "--timeout", "1",
             "--nopreview",
             "--immediate"
+        ]'''
+        
+        cmd = [
+            "rpicam-still",
+            "-o", IMAGE_PATH,
+            "--timeout", "1000",     # allow proper exposure (1 second)
+            "--nopreview",
+            "--awb", "auto",
+            "--width", "1280",
+            "--height", "720",
+            "--quality", "95"
         ]
+
+        try:
+            subprocess.run(cmd, check=True)
+            print(f"[SUCCESS] Image saved at: {IMAGE_PATH}")
+        except subprocess.CalledProcessError as e:
+            print("[ERROR] Capture failed:", e)
 
         subprocess.run(cmd, check=True)
 
