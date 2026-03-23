@@ -11,6 +11,7 @@ import pygame
 import speech_recognition as sr
 from gtts import gTTS, gTTSError
 import pyttsx3
+import subprocess
 
 import lib
 from gpiozero import Button
@@ -27,7 +28,7 @@ exit_button = lib.test.exit_button
 # TTS ENGINE SETUP
 # ---------------------------
 engine = pyttsx3.init()
-engine.setProperty("rate", 150)
+engine.setProperty("rate", 250)
 
 # ---------------------------
 # SPEAK FUNCTION (core)
@@ -253,7 +254,11 @@ def wait_for_button(button, duration: float):
         time.sleep(0.1)
     return False
 
-
+def play_audio(file):
+    path = os.path.join("audio", file)
+    print("Playing:", path)
+    subprocess.Popen(["mpg123", "-q", path])
+    time.sleep(1.5)
 # ---------------------------
 # BUTTON MODE LOGIC
 # ---------------------------
@@ -307,41 +312,50 @@ def button_selection_mode():
         #speak("...options...")
 
         # === OPTION 1 ===
-        speak("...time...")
+        #speak("time")
+        play_audio("time.mp3")
         if wait_for_button(button2, 1.5):
             tell_time()
 
         # === GROUP 2 ===
-        speak("...detection...")
+        #speak("detection")
+        play_audio("detection.mp3")
         result = wait_for_button(button2, 1.5)
         if result:
-            speak("...detect currency...")
+            #speak("detect currency")
+            play_audio("currency.mp3")
             if wait_for_button(button2, 1.5):
                 currency_detect()
 
-            speak("...describe...")
+            #speak("describe")
+            play_audio("describe.mp3")
             if wait_for_button(button2, 1.5):
                 gemini_ai()
 
-            speak("...detect object...")
+            #speak("detect object")
+            play_audio("object.mp3")
             if wait_for_button(button2, 1.5):
                 #shot_detect_obj() 
                 object_detection()
 
         # === GROUP 3 ===
-        speak("...Text...")
+        #speak("Text")
+        play_audio("text.mp3")
         result = wait_for_button(button2, 1.5)
         if result:
-            speak("...Summarize...")
+            #speak("Summarize")
+            play_audio("summarize.mp3")
             if wait_for_button(button2, 1.5):
                 text_summary()
 
-            speak("...instant read...")
+            #speak("instant read")
+            play_audio("read.mp3")
             if wait_for_button(button2, 1.5):
                 ai_extract_text()
 
         # === LANGUAGE SELECTION ===
-        speak("language")
+        #speak("language")
+        play_audio("language.mp3")
         if wait_for_button(button2, 1.5):
             select_language()
 
