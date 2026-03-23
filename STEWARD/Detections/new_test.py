@@ -237,6 +237,13 @@ def wait_with_button2_check(duration):
             return "exit"
         time.sleep(0.1)
     return False
+    
+def play_audio(file):
+    path = os.path.join("audio", file)
+    print("Playing:", path)
+    subprocess.Popen(["mpg123", "-q", path])
+    time.sleep(1.5)
+
 
 # =========================
 # STEWARD CLASS
@@ -305,7 +312,7 @@ class STEWARD:
         
         
     def capture_image(self):
-        read_text("CAMERA READY")
+        play_audio("ready.mp3")
         '''filename = None
 
         picam2 = Picamera2()
@@ -321,11 +328,11 @@ class STEWARD:
 
                 if button2.is_pressed:
                     #read_text("Capturing image")
-                    self.delete_existing_files()
+                    #self.delete_existing_files()
                     #filename = os.path.join(self.image_dir, "image.jpg")
                     #cv2.imwrite(filename, frame)
                     filename = self.capture_image_rpicam()
-                    read_text("Analyzing image")
+                    play_audio("analyze.mp3")
                     #break
                     return filename
 
@@ -385,7 +392,7 @@ class STEWARD:
         )
 
         read_text(short_desc)
-        read_text("Press the button for more details.")
+        play_audio("details.mp3")
 
         if wait_with_button2_check(2):
             detailed = self.gemini_image_prompt(
@@ -527,3 +534,5 @@ def summarize_text():
 # =========================
 #if __name__ == "__main__":
 #    chat()
+
+
