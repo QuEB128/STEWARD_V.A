@@ -11,6 +11,7 @@ import pygame
 import speech_recognition as sr
 from gtts import gTTS, gTTSError
 import pyttsx3
+import subprocess
 
 import lib
 from gpiozero import Button
@@ -27,15 +28,14 @@ exit_button = lib.test.exit_button
 # TTS ENGINE SETUP
 # ---------------------------
 engine = pyttsx3.init()
-engine.setProperty("rate", 150)
+engine.setProperty("rate", 250)
 
 # ---------------------------
 # SPEAK FUNCTION (core)
 # ---------------------------
-def speak(text: str):
-    """Text-to-speech wrapper"""
+"""def speak(text: str):
     engine.say(text)
-    engine.runAndWait()
+    engine.runAndWait()"""
 
 from datetime import datetime
 
@@ -142,7 +142,7 @@ def select_language():
         ("Hausa", "ha")
     ]
 
-    speak("Language selection mode activated:")
+    #speak("Language selection mode activated:")
 
     for lang_name, lang_code in languages:
         speak(lang_name)
@@ -165,7 +165,6 @@ def select_language():
     with open(os.path.join(os.path.dirname(__file__), "Detections/lang.txt"), "w") as f:
         f.write("en")
     return "en"
-
 
 
 # ---------------------------
@@ -202,6 +201,9 @@ def shot_detect_obj():
     lib.detectObjFromImg.detectImg()
 '''
 
+def object_detection():
+    lib.detect_objects.detectImg()
+    
 def gemini_ai():
     lib.test.start_chat()
 
@@ -222,6 +224,12 @@ def ai_extract_text():
 
 def ai_extract_text_voice():
     lib.test.ai_extract_text()
+    
+def text_summary():
+    lib.test.summarize_text()
+    
+def speak(msg):
+    lib.test.read_text(msg)
 
 # --------------------------
 # HELPER FUNCTIONS
@@ -246,7 +254,11 @@ def wait_for_button(button, duration: float):
         time.sleep(0.1)
     return False
 
-
+def play_audio(file):
+    path = os.path.join("audio", file)
+    print("Playing:", path)
+    subprocess.Popen(["mpg123", "-q", path])
+    time.sleep(1.5)
 # ---------------------------
 # BUTTON MODE LOGIC
 # ---------------------------
@@ -293,55 +305,64 @@ def wait_for_button(button, duration: float):
 '''
 
 def button_selection_mode():
-    speak("...button select mode activated...")
+    #speak("...button select mode activated...")
 
     while True:
         led.off()
-        speak("...options...")
+        #speak("...options...")
 
         # === OPTION 1 ===
-        speak("...tell time...")
+        #speak("time")
+        play_audio("time.mp3")
         if wait_for_button(button2, 1.5):
             tell_time()
 
         # === GROUP 2 ===
-        speak("...detection features...")
+        #speak("detection")
+        play_audio("detection.mp3")
         result = wait_for_button(button2, 1.5)
         if result:
-            speak("...detect currency...")
+            #speak("detect currency")
+            play_audio("currency.mp3")
             if wait_for_button(button2, 1.5):
                 currency_detect()
 
-            speak("...describe environment...")
+            #speak("describe")
+            play_audio("describe.mp3")
             if wait_for_button(button2, 1.5):
                 gemini_ai()
 
-            speak("...object detection...")
+            #speak("detect object")
+            play_audio("object.mp3")
             if wait_for_button(button2, 1.5):
                 #shot_detect_obj() 
-                print("detect object")
+                object_detection()
 
         # === GROUP 3 ===
-        speak("...Text extraction...")
+        #speak("Text")
+        play_audio("text.mp3")
         result = wait_for_button(button2, 1.5)
         if result:
-            speak("...Online read...")
+            #speak("Summarize")
+            play_audio("summarize.mp3")
             if wait_for_button(button2, 1.5):
-                text_to_speech()
+                text_summary()
 
-            speak("...instant read...")
+            #speak("instant read")
+            play_audio("read.mp3")
             if wait_for_button(button2, 1.5):
                 ai_extract_text()
 
         # === LANGUAGE SELECTION ===
-        speak("Select language for assistant.")
+        #speak("language")
+        play_audio("language.mp3")
         if wait_for_button(button2, 1.5):
             select_language()
 
         # ------------------------------------
         # ? AFTER ALL OPTIONS: WAIT HERE
         # ------------------------------------
-        speak("Press the select button to hear options again.")
+        #speak("Press the select button to hear options again.")
         while True:
             if button2.is_pressed:
                 break
@@ -356,7 +377,8 @@ def button_selection_mode():
 # MAIN PROGRAM LOOP (OPTIONAL)
 # ---------------------------
 def main():
-    speak("Steward Vision Assistant is ready.")
+    #speak("Steward Vision Assistant is ready.")
+    play_audio("sys_ready.mp3")
 
     while True:
         press = wait_with_button_check(0.5)
