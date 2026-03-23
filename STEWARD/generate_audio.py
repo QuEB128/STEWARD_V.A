@@ -14,6 +14,8 @@ phrases = {
     "ready": "camera ready",
     "analyze": "analyzing",
     "details": "select for more details",
+    "no_internet": "Please connect to the internet to use this feature",
+    "sys_ready": "Steward vision assistant is ready"
 }
 
 for name, text in phrases.items():
