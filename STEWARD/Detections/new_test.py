@@ -370,7 +370,7 @@ class STEWARD:
     # -------------------------
     # GEMINI HELPERS
     # -------------------------
-    def gemini_image_prompt(self, image, prompt):
+    '''def gemini_image_prompt(self, image, prompt):
         if not is_internet_available():
             play_audio("no_internet.mp3")
             return
@@ -378,7 +378,34 @@ class STEWARD:
             model=self.model_name,
             contents=[prompt, image]
         )
-        return response.text.replace("*", "")
+        return response.text.replace("*", "")'''
+        
+    def gemini_image_prompt(self, image, prompt):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
+
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=[prompt, image]
+        )
+
+        text = response.text
+        print(f"Raw: \n {text}\n\n")
+
+        # 1. Remove asterisks
+        text = text.replace("*", "")
+
+        # 2. Remove line breaks and tabs
+        text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+
+        # 3. Remove extra spaces (keep only single spaces)
+        text = re.sub(r"\s+", " ", text)
+
+        # 4. Strip leading/trailing spaces
+        text = text.strip()
+
+        return text
 
     # -------------------------
     # FEATURES
