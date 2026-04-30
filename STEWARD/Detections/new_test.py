@@ -380,7 +380,7 @@ class STEWARD:
         )
         return response.text.replace("*", "")'''
         
-    def gemini_image_prompt(self, image, prompt):
+    '''def gemini_image_prompt(self, image, prompt):
         if not is_internet_available():
             play_audio("no_internet.mp3")
             return
@@ -405,7 +405,51 @@ class STEWARD:
         # 4. Strip leading/trailing spaces
         text = text.strip()
 
-        return text
+        return text'''
+        
+    def gemini_image_prompt(self, image, prompt):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return "No internet connection."
+
+        max_retries = 5
+        delay = 2  # seconds
+
+        for attempt in range(max_retries):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[prompt, image]
+                )
+
+                text = response.text
+
+                # Clean text
+                text = text.replace("*", "")
+                text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+                text = re.sub(r"\s+", " ", text).strip()
+
+                return text
+
+            except Exception as e:
+                print(f"[ERROR] Attempt {attempt+1}: {e}")
+
+                # ?? Handle 503 specifically
+                if "503" in str(e):
+                    if attempt < max_retries - 1:
+                        time.sleep(delay)
+                        delay *= 2  # exponential backoff
+                        continue
+                    else:
+                        #play_audio("server_busy.mp3")  # create this file
+                        play_audio("sys_ready.mp3")
+                        return "Server is busy. Please try again later."
+
+                # ?? Handle other errors
+                #play_audio("error.mp3")
+                play_audio("sys_ready.mp3")
+                return "Something went wrong."
+    
 
     # -------------------------
     # FEATURES
@@ -599,5 +643,3 @@ def summarize_text():
 # =========================
 #if __name__ == "__main__":
 #    chat()
-
-
