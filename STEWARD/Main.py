@@ -230,6 +230,116 @@ def text_summary():
     
 def speak(msg):
     lib.test.read_text(msg)
+    
+    
+MAIN_MENU = [
+    ("Time", "time.mp3", tell_time),
+    ("Detection", "detection.mp3", "DETECTION_MENU"),
+    ("Text", "text.mp3", "TEXT_MENU"),
+    ("Language", "language.mp3", select_language),
+]
+
+DETECTION_MENU = [
+    ("Currency", "currency.mp3", currency_detect),
+    ("Describe", "describe.mp3", gemini_ai),
+    ("Object", "object.mp3", object_detection),
+]
+
+TEXT_MENU = [
+    ("Summarize", "summarize.mp3", text_summary),
+    ("Read", "read.mp3", ai_extract_text),
+]
+
+def get_button2_action():
+
+    start = time.time()
+
+    while button2.is_pressed:
+        time.sleep(0.01)
+
+    duration = time.time() - start
+
+    if duration >= 1:
+        return "select"
+
+    return "next"
+    
+def test_button_navigation():
+
+    while True:
+
+        if button2.is_pressed:
+
+            action = get_button2_action()
+
+            if action == "next":
+                print("NEXT")
+
+            else:
+                print("SELECT")
+
+            time.sleep(0.3)
+            
+def navigate_menu(menu, menu_name="Menu"):
+
+    index = 0
+
+    while True:
+
+        item_name, audio_file, action = menu[index]
+
+        play_audio(audio_file)
+
+        while True:
+
+            # Exit button = Back
+            if exit_button.is_pressed:
+                return
+
+            # Button2 action
+            if button2.is_pressed:
+
+                result = get_button2_action()
+
+                # NEXT
+                if result == "next":
+                    index = (index + 1) % len(menu)
+                    time.sleep(0.2)
+                    break
+
+                # SELECT
+                elif result == "select":
+
+                    if callable(action):
+
+                        play_audio("selected.mp3")  # optional
+                        action()
+
+                    elif action == "DETECTION_MENU":
+
+                        navigate_menu(
+                            DETECTION_MENU,
+                            "Detection"
+                        )
+
+                    elif action == "TEXT_MENU":
+
+                        navigate_menu(
+                            TEXT_MENU,
+                            "Text"
+                        )
+
+                    time.sleep(0.2)
+                    break
+
+            time.sleep(0.05)
+
+def new_button_mode():
+
+    navigate_menu(
+        MAIN_MENU,
+        "Main Menu"
+    )
 
 # --------------------------
 # HELPER FUNCTIONS
@@ -377,8 +487,7 @@ def button_selection_mode():
 # MAIN PROGRAM LOOP (OPTIONAL)
 # ---------------------------
 def main():
-    #speak("Steward Vision Assistant is ready.")
-    play_audio("sys_ready.mp3")
+    speak("Steward Vision Assistant is ready.")
 
     while True:
         press = wait_with_button_check(0.5)
@@ -389,7 +498,8 @@ def main():
             print("VOICE CMD:", cmd)
 
         elif press == "b_select":
-            button_selection_mode()
+            #button_selection_mode()
+            new_button_mode()
 
         elif press == "exit":
             speak("Steward vision assistant on standby....")
@@ -397,6 +507,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+    #test_button_navigation()
 
 led.close()
 button1.close()
