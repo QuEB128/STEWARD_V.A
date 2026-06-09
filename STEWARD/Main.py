@@ -312,7 +312,7 @@ def navigate_menu(menu, menu_name="Menu"):
 
                     if callable(action):
 
-                        play_audio("selected.mp3")  # optional
+                        #play_audio("selected.mp3")  # optional
                         action()
 
                     elif action == "DETECTION_MENU":
