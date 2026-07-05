@@ -1,295 +1,631 @@
 import os
+import time
+import io
+import re
+
 import pyttsx3
 import speech_recognition as sr
-import google.generativeai as genai
-import pyttsx3
+from gpiozero import Button, LED
+import threading
+from queue import Queue
+
 from PIL import Image
-import io
 import cv2
-import time
-import gpiozero
-from gpiozero import Button
-from picamera2 import Picamera2
 import numpy as np
+from picamera2 import Picamera2
 
-# Initialize the recognizer
-recognizer = sr.Recognizer()
+from google import genai
+from deep_translator import GoogleTranslator
+from gtts import gTTS
+import subprocess
+import tempfile
 
-led = gpiozero.LED(17)
+import socket
+
+
+# =========================
+# HARDWARE SETUP
+# =========================
+led = LED(17)
 button1 = Button(5)
 button2 = Button(4)
 exit_button = Button(2)
-status = 0
 
-def read_text(text):
+# =========================
+# SPEECH SETUP
+# =========================
+recognizer = sr.Recognizer()
+
+IMAGE_PATH = "image_to_examine/image.jpg"
+'''def read_text(text):
     engine = pyttsx3.init()
+    engine.setProperty("rate", 150)
     engine.say(text)
-    engine.runAndWait()
-"""
+    engine.runAndWait()'''
+    
 
+'''      
+def read_text(text, lang='en'):
+    
+    try:
+        with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
+            tts = gTTS(text=text, lang=lang)
+            tts.save(fp.name)
+
+            # Start audio playback
+            process = subprocess.Popen(
+                ["mpg123", "-q", fp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            # Monitor button while audio is playing
+            while process.poll() is None:
+                if exit_button.is_pressed:
+                    print("Button pressed stopping speech")
+                    process.terminate()
+                    break
+                time.sleep(0.05)
+
+    except Exception as e:
+        print(f"? Failed to speak: {e}") 
+        
+    
 def read_text(text):
-    engine = pyttsx3.init()
+    try:
+        # =========================
+        # READ LANGUAGE CODE
+        # =========================
+        lang_file = os.path.join(os.path.dirname(__file__), "lang.txt")
+        lang_code = None
 
-    # Get available voices
-    voices = engine.getProperty('voices')
+        if os.path.exists(lang_file):
+            with open(lang_file, "r") as f:
+                code = f.read().strip().lower()
+                if code:
+                    lang_code = code
 
-    # Try to find a female voice, else default to the first available voice
-    female_voice = None
-    for voice in voices:
-        if "female" in voice.name.lower() or "Zira" in voice.name or "Samantha" in voice.name:
-            female_voice = voice.id
+        # =========================
+        # TRANSLATE (IF NEEDED)
+        # =========================
+        if lang_code:
+            try:
+                spoken_text = GoogleTranslator(source='en', target=lang_code).translate(text)
+                tts_lang = lang_code
+                print(f"Translated ({lang_code}): {spoken_text}")
+            except Exception as e:
+                print(f"? Translation failed, speaking English: {e}")
+                spoken_text = text
+                tts_lang = "en"
+        else:
+            spoken_text = text
+            tts_lang = "en"
+            print("No language set speaking English")
+
+        # =========================
+        # TEXT TO SPEECH
+        # =========================
+        with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as fp:
+            tts = gTTS(text=spoken_text, lang=tts_lang)
+            tts.save(fp.name)
+
+            process = subprocess.Popen(
+                ["mpg123", "-q", fp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            # =========================
+            # BUTTON INTERRUPT
+            # =========================
+            while process.poll() is None:
+                if exit_button.is_pressed:
+                    print("?? Button pressed stopping speech")
+                    process.terminate()
+                    break
+                time.sleep(0.05)
+
+    except Exception as e:
+        print("? Error:", e)'''
+
+def is_internet_available(timeout=2):
+    try:
+        # Connect to a reliable host (Google DNS)
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(("8.8.8.8", 53))
+        return True
+    except Exception:
+        return False
+        
+# -----------------------
+# Split text into smaller chunks
+# -----------------------
+def split_text_into_chunks(text, max_chars=200):
+    sentences = re.split(r'(?<=[.!?]) +', text)
+    chunks = []
+    current = ""
+    for s in sentences:
+        if len(current) + len(s) < max_chars:
+            current += s + " "
+        else:
+            chunks.append(current.strip())
+            current = s + " "
+    if current:
+        chunks.append(current.strip())
+    return chunks
+
+# -----------------------
+# Main streaming TTS function
+# -----------------------
+def read_text(text):
+    if not is_internet_available():
+        play_audio("no_internet.mp3")
+        return
+
+    lang_file = os.path.join(os.path.dirname(__file__), "lang.txt")
+    lang_code = None
+
+    print(text)
+
+    if os.path.exists(lang_file):
+        with open(lang_file, "r") as f:
+            code = f.read().strip().lower()
+            if code:
+                lang_code = code
+
+    # Translate text (optional)
+    try:
+        if lang_code:
+            spoken_text = GoogleTranslator(
+                source="en",
+                target=lang_code
+            ).translate(text)
+        else:
+            spoken_text = text
+            lang_code = "en"
+    except Exception:
+        spoken_text = text
+        lang_code = "en"
+
+    # Split into chunks
+    chunks = split_text_into_chunks(spoken_text)
+
+    # Queue for TTS mp3 files
+    audio_queue = Queue(maxsize=2)
+
+    # -----------------------
+    # Worker thread
+    # -----------------------
+    def tts_worker():
+        for chunk in chunks:
+            if exit_button.is_pressed:
+                break
+
+            try:
+                # Create temporary MP3
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+                    tts = gTTS(text=chunk, lang=lang_code)
+                    tts.save(fp.name)
+
+                    # Create faster version
+                    fast_file = fp.name.replace(".mp3", "_fast.mp3")
+
+                    subprocess.run(
+                        [
+                            "ffmpeg",
+                            "-loglevel", "quiet",
+                            "-y",
+                            "-i", fp.name,
+                            "-filter:a", "atempo=1.3",
+                            fast_file
+                        ],
+                        check=True
+                    )
+
+                    # Remove original MP3
+                    os.remove(fp.name)
+
+                    # Queue the faster version
+                    audio_queue.put(fast_file)
+
+            except Exception as e:
+                print(f"TTS generation error: {e}")
+
+        # Signal end of queue
+        audio_queue.put(None)
+
+    threading.Thread(target=tts_worker, daemon=True).start()
+
+    # -----------------------
+    # Playback loop
+    # -----------------------
+    while True:
+        mp3_path = audio_queue.get()
+
+        if mp3_path is None:
             break
 
-    if female_voice:
-        engine.setProperty('voice', female_voice)
-    else:
-        engine.setProperty('voice', voices[0].id)  # Default to first voice if no female voice is found
+        try:
+            process = subprocess.Popen(
+                ["mpg123", "-q", mp3_path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
 
-    engine.setProperty('rate', 150)  # Set speech rate
-    engine.say(text)
-    engine.runAndWait()
-"""
+            while process.poll() is None:
+                if exit_button.is_pressed:
+                    process.terminate()
+                    return
 
-def recognize_speech():
-    with sr.Microphone() as source:
-        read_text("Please say your command.")
-        recognizer.adjust_for_ambient_noise(source)
-        audio = recognizer.listen(source)
-    try:
-        command = recognizer.recognize_google(audio).lower()
-        return command
-    except sr.UnknownValueError:
-        return "hi"
-    except sr.RequestError:
-        read_text("Sorry, I'm having trouble accessing the Google API.")
+                time.sleep(0.05)
+
+        except Exception as e:
+            print(f"Playback error: {e}")
+
+        finally:
+            if os.path.exists(mp3_path):
+                os.remove(mp3_path)
 
 def speech_to_text():
     with sr.Microphone() as source:
-        read_text("...please say your command...")
+        read_text("Please say your command")
         recognizer.adjust_for_ambient_noise(source)
         audio = recognizer.listen(source)
     try:
-        read_text("...analyzing...")
         return recognizer.recognize_google(audio)
     except sr.UnknownValueError:
-        read_text("...Sorry, I do not understand you")
-        return speech_to_text()
+        read_text("Sorry, I did not understand")
+        return ""
     except sr.RequestError:
-        read_text("please make sure you are online")
-
-def wait_with_button_check(duration):
-    start_time = time.time()
-    while time.time() - start_time < duration:
-        if button1.is_pressed:
-            return "v_select"
-        if button2.is_pressed:
-            return "b_select"
-        if exit_button.is_pressed:
-            return "exit"
-        time.sleep(0.1)
-    return False
+        read_text("Network error")
+        return ""
 
 def wait_with_button2_check(duration):
-    start_time = time.time()
-    while time.time() - start_time < duration:
+    start = time.time()
+    while time.time() - start < duration:
         if button2.is_pressed:
             return True
         if exit_button.is_pressed:
             return "exit"
         time.sleep(0.1)
     return False
+    
+def play_audio(file):
+    path = os.path.join("audio", file)
+    print("Playing:", path)
+    subprocess.Popen(["mpg123", "-q", path])
+    time.sleep(1.5)
 
+
+# =========================
+# STEWARD CLASS
+# =========================
 class STEWARD:
     def __init__(self):
-        genai.configure(api_key= "AIzaSyAZqQZuWUhFds_v8rpQhyFneKuHeuoWUdk")  #"AIzaSyAjeGmI6f4vY_QAZX-fdTeYrX00_V2bWBk")  # Replace with your actual API key
-        self.directory = 'image_to_examine'
-        if not os.path.exists(self.directory):
-            os.makedirs(self.directory)
-        self.model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
-            safety_settings=[
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"}
-            ],
-            generation_config={
-                "temperature": 1,
-                "top_p": 0.95,
-                "top_k": 64,
-                "max_output_tokens": 8192,
-                "response_mime_type": "text/plain"
-            }
+        # Gemini client (NEW SDK)
+        self.client = genai.Client(
+            api_key=  "AIzaSyC8AAEdJpDA4a7ATfnwYoCMsz45mU2kZVA"#"AIzaSyATfdWOaXE96aVqFqP6hycNcBA0bekpyLU" #"AIzaSyDxoA34W61H363zaYzASrkIedgByeGEsCU"  #os.getenv("GEMINI_API_KEY")
         )
-        self.chat_session = self.model.start_chat(history=[])
 
+        self.model_name = "gemini-2.5-flash"
+
+        self.image_dir = "image_to_examine"
+        os.makedirs(self.image_dir, exist_ok=True)
+
+    # -------------------------
+    # CAMERA
+    # -------------------------
     def delete_existing_files(self):
-        for filename in os.listdir(self.directory):
-            os.remove(os.path.join(self.directory, filename))
+        for f in os.listdir(self.image_dir):
+            os.remove(os.path.join(self.image_dir, f))
 
-    '''def captureImg(self):
-        status = 0
-        read_text("Keep the camera steady before clicking the button...")
-        filename = None
+    #IMAGE_PATH = "image_to_examine/image.jpg"
+
+    def capture_image_rpicam(self):       
+        
+        os.makedirs("image_to_examine", exist_ok=True)
+
+        '''# Small delay to allow camera auto-exposure
+        time.sleep(1)
+
+        cmd = [
+            "rpicam-still",
+            "-o", IMAGE_PATH,
+            "--timeout", "1",
+            "--nopreview",
+            "--immediate"
+        ]'''
+        
+        cmd = [
+            "rpicam-still",
+            "-o", IMAGE_PATH,
+            "--timeout", "1000",     # allow proper exposure (1 second)
+            "--nopreview",
+            "--awb", "auto",
+            "--width", "1280",
+            "--height", "720",
+            "--quality", "95"
+        ]
+
         try:
-            picam2 = Picamera2()
-            #picam2.configure(picam2.create_still_configuration(main={"size": (640, 480)}))
-            picam2.configure(picam2.create_video_configuration(main={"size": (640, 480)}))
-            picam2.start()
-            time.sleep(2)
+            subprocess.run(cmd, check=True)
+            print(f"[SUCCESS] Image saved at: {IMAGE_PATH}")
+        except subprocess.CalledProcessError as e:
+            print("[ERROR] Capture failed:", e)
+
+        subprocess.run(cmd, check=True)
+
+        # Rotate anti-clockwise
+        img = cv2.imread(IMAGE_PATH)
+        rotated = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+        cv2.imwrite(IMAGE_PATH, rotated)
+        
+        return IMAGE_PATH
+        
+        
+    def capture_image(self):
+        play_audio("ready.mp3")
+        '''filename = None
+
+        picam2 = Picamera2()
+        picam2.configure(
+            picam2.create_still_configuration(main={"size": (640, 480)})
+        )
+        picam2.start()
+        time.sleep(2)'''
+
+        try:
             while True:
-                frame = picam2.capture_array()
-                #cv2.imshow("Camera Feed", frame)
+                #frame = picam2.capture_array()
 
                 if button2.is_pressed:
-                    read_text("...analyzing")
-                    self.delete_existing_files()
-                    filename = os.path.join(self.directory, 'image.jpg')
-                    cv2.imwrite(filename, frame)
-                    break
-                elif exit_button.is_pressed:
-                    return (1)
-                    break
+                    #read_text("Capturing image")
+                    #self.delete_existing_files()
+                    #filename = os.path.join(self.image_dir, "image.jpg")
+                    #cv2.imwrite(filename, frame)
+                    filename = self.capture_image_rpicam()
+                    play_audio("analyze.mp3")
+                    #break
+                    return filename
 
-                if cv2.waitKey(1) == 27:
-                    break
-            cv2.destroyAllWindows()
-        except Exception as e:
-            print(f"An error occurred: {e}")
+                if exit_button.is_pressed:
+                    return None
+
+                time.sleep(0.05)
+
         finally:
-            picam2.stop()
-            picam2.close()
+            print("done")
+            '''picam2.stop()
+            picam2.close()'''
 
-        return filename'''
-    def captureImg(self):
-        status = 0
-        read_text("Keep the camera steady before clicking the button...")
-        filename = None
-        try:
-            picam2 = Picamera2()
-            picam2.configure(picam2.create_still_configuration(main={"size": (640, 480)}))
-            picam2.start()
-            time.sleep(2)
-            while True:
-                frame = picam2.capture_array()
-
-                if button2.is_pressed:
-                    read_text("...analyzing")
-                    self.delete_existing_files()
-                    filename = os.path.join(self.directory, 'image.jpg')
-                    cv2.imwrite(filename, frame)
-                    break
-                elif exit_button.is_pressed:
-                    return 1
-                    break
-
-                time.sleep(0.05)  # replaces cv2.waitKey
-
-        except Exception as e:
-            print(f"An error occurred: {e}")
-        finally:
-            picam2.stop()
-            picam2.close()
-
-        return filename
-
+        #return None #filename
 
     def load_image(self):
-        image_path = os.path.join(self.directory, "image.jpg")
-        image = Image.open(image_path).convert("RGB")
-        return image
+        path = os.path.join(self.image_dir, "image.jpg")
+        return Image.open(path).convert("RGB")
 
+    # -------------------------
+    # GEMINI HELPERS
+    # -------------------------
+    '''def gemini_image_prompt(self, image, prompt):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=[prompt, image]
+        )
+        return response.text.replace("*", "")'''
+        
+    '''def gemini_image_prompt(self, image, prompt):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
+
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=[prompt, image]
+        )
+
+        text = response.text
+        print(f"Raw: \n {text}\n\n")
+
+        # 1. Remove asterisks
+        text = text.replace("*", "")
+
+        # 2. Remove line breaks and tabs
+        text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+
+        # 3. Remove extra spaces (keep only single spaces)
+        text = re.sub(r"\s+", " ", text)
+
+        # 4. Strip leading/trailing spaces
+        text = text.strip()
+
+        return text'''
+        
+    def gemini_image_prompt(self, image, prompt):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return "No internet connection."
+
+        max_retries = 5
+        delay = 2  # seconds
+
+        for attempt in range(max_retries):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[prompt, image]
+                )
+
+                text = response.text
+
+                # Clean text
+                text = text.replace("*", "")
+                text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+                text = re.sub(r"\s+", " ", text).strip()
+
+                return text
+
+            except Exception as e:
+                print(f"[ERROR] Attempt {attempt+1}: {e}")
+
+                # ?? Handle 503 specifically
+                if "503" in str(e):
+                    if attempt < max_retries - 1:
+                        time.sleep(delay)
+                        delay *= 2  # exponential backoff
+                        continue
+                    else:
+                        #play_audio("server_busy.mp3")  # create this file
+                        play_audio("sys_ready.mp3")
+                        return "Server is busy. Please try again later."
+
+                # ?? Handle other errors
+                #play_audio("error.mp3")
+                play_audio("sys_ready.mp3")
+                return "Something went wrong."
+    
+
+    # -------------------------
+    # FEATURES
+    # -------------------------
     def describe_image(self):
         led.on()
-        status = self.captureImg()
-        if status == 1:
-            read_text("exiting...")
+        if not self.capture_image():
             led.off()
-            return 
-        image = self.load_image()
-        response = self.chat_session.send_message(image)
+            return
 
-        read_text(response.text.replace("*", ""))
+        image = self.load_image()
+        text = self.gemini_image_prompt(
+            image,
+            "Describe this image clearly for a visually impaired person.(in less than 50 words)"
+        )
+        read_text(text)
         led.off()
 
     def start_chat(self):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
+            
         led.on()
-        status = self.captureImg()
-        if status == 1:
-            read_text("exiting...")
+        if not self.capture_image():
             led.off()
-            return 
+            return
+
         image = self.load_image()
-        response = self.chat_session.send_message(image)
-        response = self.chat_session.send_message("Describe this image briefly and detailed in less than 30 words.")
-        resp = response.text.replace("*", "")
-        print(resp)
-        read_text(resp)
-        read_text("click for detailed description.")
-        result = wait_with_button2_check(1)
-        if result:
-            response = self.chat_session.send_message("describe this as though you are a vision assistant to a in less than 100 words")
-            resp = response.text.replace("*", "")
-            print(resp)
-            read_text(resp)
+        short_desc = self.gemini_image_prompt(
+            image,
+            "Describe this image in less than 30 words."
+        )
+
+        read_text(short_desc)
+        play_audio("details.mp3")
+
+        if wait_with_button2_check(2):
+            detailed = self.gemini_image_prompt(
+                image,
+                "Describe this image in detail as a vision assistant. (in less than 100 words)"
+            )
+            read_text(detailed)
+
         led.off()
-        return True
 
     def detect_currency(self):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
+            
         led.on()
-        status = self.captureImg()
-        if status == 1:
-            read_text("exiting...")
+        if not self.capture_image():
             led.off()
-            return 
+            return
+
         image = self.load_image()
-        self.chat_session.send_message("detect currency and amount of money in the image and read only that. But if there is now money in the image say 'No money detected'.")
-        response = self.chat_session.send_message(image)
-        read_text(response.text.replace("*", ""))
+        text = self.gemini_image_prompt(
+            image,
+            "Detect currency and amount(example: 20 ghana cedis). If none, say 'No money detected'."
+        )
+        read_text(text)
         led.off()
 
     def translate_language(self):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
         led.on()
-        status = self.captureImg()
-        if status == 1:
-            read_text("exiting...")
+        if not self.capture_image():
             led.off()
-            return 
+            return
+
         image = self.load_image()
-        self.chat_session.send_message("translate the text in the image to english . but if there is no text in the image,simply say 'No visibe text detected'")
-        response = self.chat_session.send_message(image)
-        read_text(response.text.replace("*", ""))
+        text = self.gemini_image_prompt(
+            image,
+            "Translate any visible text to English. If none, say 'No visible text detected'."
+        )
+        read_text(text)
         led.off()
 
-    def chat(self):
+    def extract_text_exact(self):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
+            
         led.on()
-        self.chat_session.send_message("hello")
-        read_text("... AI mode activated")
+        if not self.capture_image():
+            led.off()
+            return
+
+        image = self.load_image()
+        text = self.gemini_image_prompt(
+            image,
+            "Extract the exact text in this image. Do not add words."
+        )
+        read_text(text)
+        led.off()
+        
+    def summarize_text(self):
+        if not is_internet_available():
+            play_audio("no_internet.mp3")
+            return
+            
+        led.on()
+        if not self.capture_image():
+            led.off()
+            return
+
+        image = self.load_image()
+        text = self.gemini_image_prompt(
+            image,
+            "summarize the exact text in this image as brief as possible."
+        )
+        read_text(text)
+        led.off()
+        
+    
+
+    def chat_mode(self):
+        led.on()
+        read_text("AI mode activated")
+
         while True:
-            text = speech_to_text()
-            if any(k in text.lower() for k in ["exit", "back", "return", "quit"]):
+            #user_text = speech_to_text().lower()
+            user_text = input(">> ").lower()
+
+            if any(k in user_text for k in ["exit", "quit", "back"]):
                 break
-            if exit_button.is_pressed:
-                break
-            elif any(k in text.lower() for k in ["describe", "detect", "read", "image"]):
+
+            if any(k in user_text for k in ["describe", "image", "see"]):
                 self.start_chat()
             else:
-                self.chat_session.send_message("generate a short response less than 100 words")
-                response = self.chat_session.send_message(text)
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=user_text
+                )
                 read_text(response.text.replace("*", ""))
-        led.off()
 
-    def text_extraction(self):
-        led.on()
-        status = self.captureImg()
-        if status == 1:
-            read_text("exiting...")
-            led.off()
-            return 
-        image = self.load_image()
-        self.chat_session.send_message("Assume you are an AI designed for an assistive reading device for the visually impaired. Extract the exact text in this image. Do NOT add any additional words.")
-        response = self.chat_session.send_message(image)
-        read_text(response.text.replace("*", ""))
         led.off()
 
     def ai_extract_text(self):
@@ -312,34 +648,35 @@ class STEWARD:
             read_text(response.text.replace("*", ""))
         led.off()
 
-# Entry points
+# =========================
+# ENTRY POINTS
+# =========================
 def start_chat():
-    chatbot = STEWARD()
-    chatbot.start_chat()
+    STEWARD().start_chat()
 
 def start_plus_chat():
-    chatbot = STEWARD()
-    chatbot.describe_image()
-
-def chatmain():
-    chatbot = STEWARD()
-    chatbot.chat()
-
-def translate_language():
-    chatbot = STEWARD()
-    chatbot.translate_language()
+    STEWARD().describe_image()
 
 def detect_currency():
-    chatbot = STEWARD()
-    chatbot.detect_currency()
+    STEWARD().detect_currency()
+
+def translate_language():
+    STEWARD().translate_language()
+
+def chatmain():
+    STEWARD().chat_mode()
 
 def ai_extract_text():
-    chatbot = STEWARD()
-    chatbot.ai_extract_text()
+    STEWARD().ai_extract_text()
 
 def text_extraction():
-    chatbot = STEWARD()
-    chatbot.text_extraction()
+    STEWARD().extract_text_exact()
+    
+def summarize_text():
+    STEWARD().summarize_text()
 
-# Uncomment to run directly:
-#start_chat()
+# =========================
+# RUN
+# =========================
+#if __name__ == "__main__":
+#    chat()
