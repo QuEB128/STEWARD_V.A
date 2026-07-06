@@ -42,6 +42,9 @@ phrases = {
 
     "ready": "camera ready",
     "reader": "activated",
+    "no_doc": "No documents found.",
+    "no_text": "No text documents available.",
+    "selected": "selected",
     "analyze": "analyzing",
     "details": "select for more details",
     "no_internet": "Please connect to the internet to use this feature",
