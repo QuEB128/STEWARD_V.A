@@ -14,6 +14,7 @@ import pyttsx3
 import subprocess
 
 import lib
+import cloud
 from gpiozero import Button
 from datetime import datetime
 
@@ -231,7 +232,7 @@ def text_summary():
 def speak(msg):
     lib.test.read_text(msg)
     
-    
+   
 MAIN_MENU = [
     ("Time", "time.mp3", tell_time),
     ("Detection", "detection.mp3", "DETECTION_MENU"),
@@ -340,6 +341,7 @@ def new_button_mode():
         MAIN_MENU,
         "Main Menu"
     )
+
 
 # --------------------------
 # HELPER FUNCTIONS
@@ -487,7 +489,9 @@ def button_selection_mode():
 # MAIN PROGRAM LOOP (OPTIONAL)
 # ---------------------------
 def main():
-    speak("Steward Vision Assistant is ready.")
+    #speak("Steward Vision Assistant is ready.")
+    cloud.download_repo_folder()
+    play_audio("sys_ready.mp3")
 
     while True:
         press = wait_with_button_check(0.5)
@@ -501,13 +505,13 @@ def main():
             #button_selection_mode()
             new_button_mode()
 
+
         elif press == "exit":
             speak("Steward vision assistant on standby....")
 
 
 if __name__ == "__main__":
     main()
-    #test_button_navigation()
 
 led.close()
 button1.close()
