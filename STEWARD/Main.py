@@ -167,7 +167,71 @@ def select_language():
         f.write("en")
     return "en"
 
+def read_documents():
+    """
+    Browse Docs folder and read selected document aloud.
+    Supports .txt files for now (can extend later).
+    """
 
+    docs_path = os.path.join(os.path.dirname(__file__), "Docs")
+
+    if not os.path.exists(docs_path):
+        #speak("No documents found.")
+        play_audio("no_doc.mp3")
+        return
+
+    files = [f for f in os.listdir(docs_path) if f.endswith(".txt")]
+
+    if not files:
+        #speak("No text documents available.")
+        play_audio("no_text.mp3")
+        return
+
+    index = 0
+
+    #speak("Document reader activated.")
+    play_audio("selected.mp3")
+
+    while True:
+
+        current_file = files[index]
+        #play_audio("selected.mp3")  # optional feedback
+        subprocess.run(["espeak", current_file])
+
+        # wait for button action
+        if button2.is_pressed:
+
+            action = get_button2_action()
+
+            # NEXT FILE
+            if action == "next":
+                index = (index + 1) % len(files)
+
+            # SELECT FILE
+            elif action == "select":
+
+                file_path = os.path.join(docs_path, current_file)
+
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+
+                    if not content.strip():
+                        subprocess.run(["espeak", "This document is empty."])
+                    else:
+                        subprocess.run(["espeak", content])
+                        #speak(content)
+
+                except Exception as e:
+                    speak("Error reading file.")
+                    print(e)
+
+        if exit_button.is_pressed:
+            subprocess.run(["espeak", "Exiting document reader."])
+            return
+
+        time.sleep(0.2)
+        
 # ---------------------------
 # TASK FUNCTIONS
 # ---------------------------
@@ -248,6 +312,7 @@ DETECTION_MENU = [
 
 TEXT_MENU = [
     ("Summarize", "summarize.mp3", text_summary),
+    ("Documents", "docs.mp3", read_documents), 
     ("Read", "read.mp3", ai_extract_text),
 ]
 
