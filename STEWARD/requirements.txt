@@ -11,3 +11,5 @@ playsound
 opencv-python
 numpy<2
 deep-translator
+PyPDF2
+python-docx
