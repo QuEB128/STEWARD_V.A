@@ -13,6 +13,9 @@ from gtts import gTTS, gTTSError
 import pyttsx3
 import subprocess
 
+from PyPDF2 import PdfReader
+from docx import Document
+
 import lib
 import cloud
 from gpiozero import Button
@@ -166,6 +169,86 @@ def select_language():
     with open(os.path.join(os.path.dirname(__file__), "Detections/lang.txt"), "w") as f:
         f.write("en")
     return "en"
+    
+def split_into_chunks(text, chunk_size=400):
+    """
+    Split long text into speech-friendly chunks.
+
+    Tries to break at sentence endings first.
+    Falls back to spaces if necessary.
+    """
+
+    chunks = []
+
+    while len(text) > chunk_size:
+
+        split = text.rfind(".", 0, chunk_size)
+
+        if split == -1:
+            split = text.rfind(" ", 0, chunk_size)
+
+        if split == -1:
+            split = chunk_size
+
+        chunks.append(text[:split + 1].strip())
+
+        text = text[split + 1:].strip()
+
+    if text:
+        chunks.append(text)
+
+    return chunks
+
+def extract_document_text(file_path):
+    """
+    Extract text from TXT, PDF and DOCX files.
+    Returns extracted text or None if unsupported/error.
+    """
+
+    ext = os.path.splitext(file_path)[1].lower()
+
+    try:
+        # ---------------- TXT ----------------
+        if ext == ".txt":
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                return f.read()
+
+        # ---------------- PDF ----------------
+        elif ext == ".pdf":
+            reader = PdfReader(file_path)
+
+            text = ""
+
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+
+            return text
+
+        # ---------------- WORD ----------------
+        elif ext in [".docx", ".doc"]:
+
+            # python-docx only supports docx.
+            # .doc files should first be converted.
+            if ext == ".doc":
+                return None
+
+            document = Document(file_path)
+
+            paragraphs = [
+                p.text
+                for p in document.paragraphs
+                if p.text.strip()
+            ]
+
+            return "\n".join(paragraphs)
+
+        return None
+
+    except Exception as e:
+        print(f"Document read error: {e}")
+        return None
 
 def read_documents():
     """
@@ -180,7 +263,18 @@ def read_documents():
         play_audio("no_doc.mp3")
         return
 
-    files = [f for f in os.listdir(docs_path) if f.endswith(".txt")]
+    #files = [f for f in os.listdir(docs_path) if f.endswith(".txt")]
+    SUPPORTED_TYPES = (
+        ".txt",
+        ".pdf",
+        ".docx",
+        ".doc"
+    )
+
+    files = [
+        f for f in os.listdir(docs_path)
+        if f.lower().endswith(SUPPORTED_TYPES)
+    ]
 
     if not files:
         #speak("No text documents available.")
@@ -213,14 +307,30 @@ def read_documents():
                 file_path = os.path.join(docs_path, current_file)
 
                 try:
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        content = f.read()
 
-                    if not content.strip():
+                    content = extract_document_text(file_path)
+
+                    if not content:
+                        subprocess.run([
+                            "espeak",
+                            "Unable to read this document."
+                        ])
+
+                    elif not content.strip():
                         subprocess.run(["espeak", "This document is empty."])
+
                     else:
-                        subprocess.run(["espeak", content])
-                        #speak(content)
+
+                        chunks = split_into_chunks(content)
+
+                        for chunk in chunks:
+
+                            subprocess.run(["espeak", chunk])
+
+                            # Allow user to exit while reading
+                            if exit_button.is_pressed:
+                                subprocess.run(["espeak", "Reading stopped."])
+                                return
 
                 except Exception as e:
                     speak("Error reading file.")
