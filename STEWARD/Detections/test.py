@@ -216,7 +216,7 @@ def read_text(text):
                             "-loglevel", "quiet",
                             "-y",
                             "-i", fp.name,
-                            "-filter:a", "atempo=1.3",
+                            "-filter:a", "atempo=1.35",
                             fast_file
                         ],
                         check=True
