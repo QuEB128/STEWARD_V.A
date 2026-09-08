@@ -307,7 +307,7 @@ class STEWARD:
             api_key=  "AIzaSyC8AAEdJpDA4a7ATfnwYoCMsz45mU2kZVA"#"AIzaSyATfdWOaXE96aVqFqP6hycNcBA0bekpyLU" #"AIzaSyDxoA34W61H363zaYzASrkIedgByeGEsCU"  #os.getenv("GEMINI_API_KEY")
         )
 
-        self.model_name = "gemini-2.5-flash"
+        self.model_name = "gemini-3.6-flash"
 
         self.image_dir = "image_to_examine"
         os.makedirs(self.image_dir, exist_ok=True)
