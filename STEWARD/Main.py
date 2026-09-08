@@ -21,6 +21,10 @@ import cloud
 from gpiozero import Button
 from datetime import datetime
 
+import smtplib
+from email.message import EmailMessage
+
+
 # ---------------------------
 # HARDWARE CONFIG
 # ---------------------------
@@ -41,7 +45,51 @@ engine.setProperty("rate", 250)
     engine.say(text)
     engine.runAndWait()"""
 
-from datetime import datetime
+
+def send_steward_activation_email():
+    # ==========================
+    # EMAIL SETTINGS
+    # ==========================
+
+    SENDER_EMAIL = "equartey111000@gmail.com"
+    APP_PASSWORD = "agbl vogm purj wouc"
+
+    RECEIVER_EMAIL = "equartey128@gmail.com"
+
+    # ==========================
+    # CREATE EMAIL
+    # ==========================
+
+    msg = EmailMessage()
+
+    msg["Subject"] = "STEWARD V.A PILOT (William)"
+    msg["From"] = SENDER_EMAIL
+    msg["To"] = RECEIVER_EMAIL
+
+    msg.set_content("""
+Hello!
+
+STEWARD VISION ASSISTANT pilot test user just activated STEWARD.
+
+""")
+
+    # ==========================
+    # SEND EMAIL
+    # ==========================
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(SENDER_EMAIL, APP_PASSWORD)
+            smtp.send_message(msg)
+
+        print("✅ Email sent successfully!")
+        return True
+
+    except Exception as e:
+        print("❌ Failed to send email.")
+        print("Error:", e)
+        return False
+
 
 def tell_time():
     now = datetime.now()
@@ -667,7 +715,8 @@ def main():
     #speak("Steward Vision Assistant is ready.")
     cloud.download_repo_folder()
     play_audio("sys_ready.mp3")
-
+    send_steward_activation_email()
+    
     while True:
         press = wait_with_button_check(0.5)
 
